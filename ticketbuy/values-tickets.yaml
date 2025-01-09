@@ -1,0 +1,13 @@
+service:
+  name: tickets
+  port: 8070
+
+image:
+  repository: shadowxtof/bmstu-semester_9-rsoi-lab4-tickets
+  # This sets the pull policy for images.
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+  
+data:
+  DATABASE_URL: "postgresql://program:test@postgres-postgresql.default.svc.cluster.local:5432/tickets"
