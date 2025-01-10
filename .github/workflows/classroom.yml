@@ -14,25 +14,25 @@ jobs:
 
 
       # TODO build, publish to docker hub, deploy to k8s
-      # - name: UnitTests
-      #   uses: actions/setup-python@v3
-      #   with:
-      #     python-version: "3.10"
-      # - run: |
-      #     docker compose up postgres -d
-      #     pip install -r requirements.txt
-      #     export DATABASE_URL="postgresql://program:test@localhost:5432/flights"
-      #     pytest app/FlightService/tests.py
-      #     export DATABASE_URL="postgresql://program:test@localhost:5432/tickets"
-      #     pytest app/TicketService/tests.py
-      #     export DATABASE_URL="postgresql://program:test@localhost:5432/privileges"
-      #     pytest app/BonusService/tests.py
-      #     docker compose down
+      - name: UnitTests
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+      - run: |
+          docker compose up postgres -d
+          pip install -r requirements.txt
+          export DATABASE_URL="postgresql://program:test@localhost:5432/flights"
+          pytest app/FlightService/tests.py
+          export DATABASE_URL="postgresql://program:test@localhost:5432/tickets"
+          pytest app/TicketService/tests.py
+          export DATABASE_URL="postgresql://program:test@localhost:5432/privileges"
+          pytest app/BonusService/tests.py
+          docker compose down
 
-      # - uses: docker/setup-buildx-action@v2 
-      # - name: Build images
-      #   timeout-minutes: 10
-      #   run: docker compose build
+      - uses: docker/setup-buildx-action@v2 
+      - name: Build images
+        timeout-minutes: 10
+        run: docker compose build
       
       - name: Set up k8s
         uses: azure/setup-kubectl@v3
@@ -55,7 +55,35 @@ jobs:
         env:
           YC_SERVICE_ACCOUNT_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY }}
         run: |
+          docker login -u shadowxtof -p ${{secrets.DOCKERHUB_PASSWORD}}
+          docker tag bmstu-semester_9-rsoi-lab5-flights shadowxtof/bmstu-semester_9-rsoi-lab5-flights
+          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-flights
+          docker tag bmstu-semester_9-rsoi-lab5-bonuses shadowxtof/bmstu-semester_9-rsoi-lab5-bonuses
+          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-bonuses
+          docker tag bmstu-semester_9-rsoi-lab5-tickets shadowxtof/bmstu-semester_9-rsoi-lab5-tickets
+          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-tickets
+          docker tag bmstu-semester_9-rsoi-lab5-gateway shadowxtof/bmstu-semester_9-rsoi-lab5-gateway
+          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-gateway
           
+          echo "$YC_SERVICE_ACCOUNT_KEY" > sa-key.json
+          export YC_SERVICE_ACCOUNT_KEY_FILE=sa-key.json
+          yc config set service-account-key sa-key.json
+          yc config set cloud-id b1gdqrp33ldf7poictmn
+          yc config set folder-id b1gsf4om2su5amf1s0vo
+          mkdir -p ~/.kube
+          yc managed-kubernetes cluster list
+          yc managed-kubernetes cluster get-credentials catdnvpbp6b4j68mbgd1 --external --force > ~/.kube/config
+          kubectl cluster-info --kubeconfig ~/.kube/config
+
+          helm uninstall flights || true
+          helm install flights ./ticketbuy -f ./ticketbuy/values-flights.yaml
+          helm uninstall bonuses || true
+          helm install bonuses ./ticketbuy -f ./ticketbuy/values-bonuses.yaml
+          helm uninstall tickets || true
+          helm install tickets ./ticketbuy -f ./ticketbuy/values-tickets.yaml
+          helm uninstall gateway || true
+          helm install gateway ./ticketbuy -f ./ticketbuy/values-gateway.yaml
+          sleep 30
 
           sudo bash -c "echo '84.201.149.237 ticketbuy.ru' >> /etc/hosts"
 
