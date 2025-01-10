@@ -55,15 +55,7 @@ jobs:
         env:
           YC_SERVICE_ACCOUNT_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY }}
         run: |
-          docker login -u shadowxtof -p ${{secrets.DOCKERHUB_PASSWORD}}
-          docker tag bmstu-semester_9-rsoi-lab5-flights shadowxtof/bmstu-semester_9-rsoi-lab5-flights
-          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-flights
-          docker tag bmstu-semester_9-rsoi-lab5-bonuses shadowxtof/bmstu-semester_9-rsoi-lab5-bonuses
-          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-bonuses
-          docker tag bmstu-semester_9-rsoi-lab5-tickets shadowxtof/bmstu-semester_9-rsoi-lab5-tickets
-          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-tickets
-          docker tag bmstu-semester_9-rsoi-lab5-gateway shadowxtof/bmstu-semester_9-rsoi-lab5-gateway
-          docker push shadowxtof/bmstu-semester_9-rsoi-lab5-gateway
+          
           
           echo "$YC_SERVICE_ACCOUNT_KEY" > sa-key.json
           export YC_SERVICE_ACCOUNT_KEY_FILE=sa-key.json
