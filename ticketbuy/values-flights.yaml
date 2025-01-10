@@ -3,7 +3,7 @@ service:
   port: 8060
 
 image:
-  repository: shadowxtof/bmstu-semester_9-rsoi-lab4-flights
+  repository: shadowxtof/bmstu-semester_9-rsoi-lab5-flights
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
