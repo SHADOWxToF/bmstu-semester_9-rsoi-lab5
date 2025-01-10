@@ -83,7 +83,7 @@ jobs:
           helm install tickets ./ticketbuy -f ./ticketbuy/values-tickets.yaml
           helm uninstall gateway || true
           helm install gateway ./ticketbuy -f ./ticketbuy/values-gateway.yaml
-          sleep 30
+          sleep 60
 
           sudo bash -c "echo '84.201.149.237 ticketbuy.ru' >> /etc/hosts"
 
