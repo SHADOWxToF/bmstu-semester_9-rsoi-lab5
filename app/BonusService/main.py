@@ -22,9 +22,9 @@ app = FastAPI()
 # - BonusService POST /api/v1/bonuses/add, тело {"name", "bonuses"} - 400, 202 {"balance", "status"}, 404
 # - BonusService POST /api/v1/bonuses/calculate_price, тело {"name", "price"} - 400, 202 {"paidByMoney", "paidByBonuses"}, 404
 # - BonusService POST /api/v1/bonuses/cancel, тело {"name", "ticket"} - 400, 202 {"balance", "status"}, 404
-# database_url = os.environ["DATABASE_URL"]
+database_url = os.environ["DATABASE_URL"]
 # database_url = "postgresql://program:test@localhost:5432/privileges"
-database_url = "postgresql://program:test@postgres:5432/privileges"
+# database_url = "postgresql://program:test@postgres:5432/privileges"
 print(database_url)
 engine = create_engine(database_url)
 
