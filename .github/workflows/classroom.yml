@@ -56,26 +56,6 @@ jobs:
           YC_SERVICE_ACCOUNT_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY }}
         run: |
           
-          
-          echo "$YC_SERVICE_ACCOUNT_KEY" > sa-key.json
-          export YC_SERVICE_ACCOUNT_KEY_FILE=sa-key.json
-          yc config set service-account-key sa-key.json
-          yc config set cloud-id b1gdqrp33ldf7poictmn
-          yc config set folder-id b1gsf4om2su5amf1s0vo
-          mkdir -p ~/.kube
-          yc managed-kubernetes cluster list
-          yc managed-kubernetes cluster get-credentials catdnvpbp6b4j68mbgd1 --external --force > ~/.kube/config
-          kubectl cluster-info --kubeconfig ~/.kube/config
-
-          helm uninstall flights || true
-          helm install flights ./ticketbuy -f ./ticketbuy/values-flights.yaml
-          helm uninstall bonuses || true
-          helm install bonuses ./ticketbuy -f ./ticketbuy/values-bonuses.yaml
-          helm uninstall tickets || true
-          helm install tickets ./ticketbuy -f ./ticketbuy/values-tickets.yaml
-          helm uninstall gateway || true
-          helm install gateway ./ticketbuy -f ./ticketbuy/values-gateway.yaml
-          sleep 30
 
           sudo bash -c "echo '84.201.149.237 ticketbuy.ru' >> /etc/hosts"
 
