@@ -1237,3 +1237,6 @@ buildNumber.properties
 
 ### postgres
 db-data/
+
+### keycloak
+keycloak-data/

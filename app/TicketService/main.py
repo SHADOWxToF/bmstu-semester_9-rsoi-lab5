@@ -20,8 +20,9 @@ import uuid
 # - TicketService DELETE /api/v1/tickets/{ticketUid}, param: ticketUid - 201, 404
 
 
-database_url = os.environ["DATABASE_URL"]
+# database_url = os.environ["DATABASE_URL"]
 # database_url = "postgresql://program:test@localhost:5432/tickets"
+database_url = "postgresql://program:test@postgres:5432/tickets"
 print(database_url)
 engine = create_engine(database_url)
 

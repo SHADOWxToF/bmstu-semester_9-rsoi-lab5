@@ -17,3 +17,4 @@ data:
   BONUS_SERVICE: "bonuses-ticketbuy"
   FLIGHT_SERVICE: "flights-ticketbuy"
   TICKET_SERVICE: "tickets-ticketbuy"
+  IDENTITY_PROVIDER: "keycloak-ticketbuy"

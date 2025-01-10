@@ -17,8 +17,9 @@ app = FastAPI()
 # - FlightService GET /api/v1/flights - возвращает все рейсы
 # - FlightService GET /api/v1/flights/{flightNumber} - возвращает 200 если такой рейс существует
 
-database_url = os.environ["DATABASE_URL"]
+# database_url = os.environ["DATABASE_URL"]
 # database_url = "postgresql://program:test@localhost:5432/flights"
+database_url = "postgresql://program:test@postgres:5432/flights"
 print(f'Строка подключения к БД: {database_url}')
 engine = create_engine(database_url)
 

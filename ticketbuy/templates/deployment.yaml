@@ -49,6 +49,8 @@ spec:
               value: {{ .Values.data.FLIGHT_SERVICE }}
             - name: TICKET_SERVICE
               value: {{ .Values.data.TICKET_SERVICE }}
+            - name: IDENTITY_PROVIDER
+              value: {{ .Values.data.IDENTITY_PROVIDER }}
           livenessProbe:
             initialDelaySeconds: 5
             httpGet:

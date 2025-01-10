@@ -11,6 +11,8 @@ from multiprocessing import Process
 import os
 import requests
 from http import HTTPStatus
+from fastapi.security import OAuth2PasswordRequestForm, HTTPBearer, HTTPAuthorizationCredentials
+from middleware import validate_jwt
 
 # bonusesHost = "localhost:8050"
 # flightsHost = "localhost:8060"
@@ -25,6 +27,9 @@ bonusesAPI = f"{bonusesHost}/api/v1"
 flightsAPI = f"{flightsHost}/api/v1"
 ticketsAPI = f"{ticketsHost}/api/v1"
 
+identityProviderURL = f'{os.environ["IDENTITY_PROVIDER"]}:8080'
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     requests.post(f"http://{flightsHost}/manage/init")
@@ -34,13 +39,47 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+# Маршруты для авторизации
+@app.post("/api/v1/authorize")
+def authorize(form_data: OAuth2PasswordRequestForm = Depends()):
+    token_url = f"http://{identityProviderURL}/realms/ticketbuy/protocol/openid-connect/token"
+    data = {
+        "grant_type": "password",
+        "client_id": form_data.client_id,
+        "client_secret": form_data.client_secret,
+        "username": form_data.username,
+        "password": form_data.password,
+    }
+    response = requests.post(token_url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="Invalid credentials")
+    return response.json()
+
+@app.get("/api/v1/callback")
+def callback():
+    return {"message": "Callback endpoint"}
+
+# Middleware-like зависимость для авторизации
+security = HTTPBearer(auto_error=False)
+
+def auth_dependency(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials is None:
+        raise HTTPException(401, "Not authenticated")
+    token = credentials.credentials
+    try:
+        payload = validate_jwt(token)
+    except Exception as e:
+        raise HTTPException(401, "Bad Token")
+    return payload
+
+
 @app.get('/manage/health', status_code=200)
 def get_persons():
     return
 
 
 @app.get('/api/v1/flights', status_code=200)
-def get_persons(page: int, size: int) -> PaginationResponse:
+def get_persons(page: int, size: int, user_info: dict=Depends(auth_dependency)) -> PaginationResponse:
     response = requests.get(f"http://{flightsAPI}/flights", params={"page": page, "size": size})
     out: PaginationResponse = PaginationResponse(**response.json())
     if response.status_code == HTTPStatus.OK:
@@ -72,8 +111,9 @@ def get_persons(page: int, size: int) -> PaginationResponse:
 # }
 
 @app.get('/api/v1/tickets', status_code=200)
-def get_persons(x_user_name: str = Header()) -> list[TicketResponse]:
-    response = requests.get(f"http://{ticketsAPI}/tickets/", params={"user_name": x_user_name})
+def get_persons(user_info: dict=Depends(auth_dependency)) -> list[TicketResponse]:
+    print(user_info)
+    response = requests.get(f"http://{ticketsAPI}/tickets/", params={"user_name": user_info["preferred_username"]})
     out = []
     if response.status_code == HTTPStatus.OK:
         tickets: list[TicketJSON] = [TicketJSON(**i) for i in response.json()]
@@ -104,21 +144,22 @@ async def validation_exception_handler(request : Request, exc):
     return JSONResponse({"message": "what", "errors": exc.errors()[0]}, status_code=400)
 
 @app.post('/api/v1/tickets', status_code=200)
-def get_persons(ticketPurchaseRequest: TicketPurchaseRequest, x_user_name: str = Header()) -> TicketPurchaseResponse:
+def get_persons(ticketPurchaseRequest: TicketPurchaseRequest, user_info: dict=Depends(auth_dependency)) -> TicketPurchaseResponse:
+    user_name = user_info["preferred_username"]
     response = requests.get(f"http://{flightsAPI}/flights/{ticketPurchaseRequest.flightNumber}")
     if response.status_code != HTTPStatus.OK:
         return JSONResponse(content={"message": "Flight not found"}, status_code=404)
     flight = FlightData(**response.json())
-    response = requests.post(f"http://{ticketsAPI}/tickets/", json=jsonable_encoder(TicketDataJSON(username=x_user_name, flightNumber=ticketPurchaseRequest.flightNumber, price=ticketPurchaseRequest.price)))
+    response = requests.post(f"http://{ticketsAPI}/tickets/", json=jsonable_encoder(TicketDataJSON(username=user_name, flightNumber=ticketPurchaseRequest.flightNumber, price=ticketPurchaseRequest.price)))
     if response.status_code != HTTPStatus.CREATED:
         return JSONResponse(content={"message": "Error"}, status_code=500)
     ticket: TicketJSON = TicketJSON(**response.json())
-    response = requests.post(f"http://{bonusesAPI}/bonuses/calculate_price", json=jsonable_encoder(CalculatePriceJSON(name=x_user_name, price=ticketPurchaseRequest.price, paidFromBalance=ticketPurchaseRequest.paidFromBalance, ticketUid=ticket.ticketUid)))
+    response = requests.post(f"http://{bonusesAPI}/bonuses/calculate_price", json=jsonable_encoder(CalculatePriceJSON(name=user_name, price=ticketPurchaseRequest.price, paidFromBalance=ticketPurchaseRequest.paidFromBalance, ticketUid=ticket.ticketUid)))
     if response.status_code != HTTPStatus.ACCEPTED:
         return JSONResponse(content={"message": "Error"}, status_code=500)
     payment: PaymentDataJSON = PaymentDataJSON(**response.json())
 
-    response = requests.get(f"http://{bonusesAPI}/bonuses/{x_user_name}")
+    response = requests.get(f"http://{bonusesAPI}/bonuses/{user_name}")
     if response.status_code != HTTPStatus.OK:
         return JSONResponse(content={"message": "Error"}, status_code=500)
     privilege = PrivilegeDataJSON(**response.json())
@@ -175,8 +216,9 @@ def get_persons(ticketPurchaseRequest: TicketPurchaseRequest, x_user_name: str =
 # }
 
 @app.get('/api/v1/tickets/{ticketUid}', status_code=200)
-def get_persons(ticketUid: str, x_user_name: str = Header()) -> TicketResponse:
-    response = requests.get(f"http://{ticketsAPI}/tickets/", params={"user_name": x_user_name})
+def get_persons(ticketUid: str, user_info: dict=Depends(auth_dependency)) -> TicketResponse:
+    user_name = user_info["preferred_username"]
+    response = requests.get(f"http://{ticketsAPI}/tickets/", params={"user_name": user_name})
     if response.status_code != HTTPStatus.OK:
         return JSONResponse(content={"message": "User not found"}, status_code=404)
 
@@ -209,7 +251,8 @@ def get_persons(ticketUid: str, x_user_name: str = Header()) -> TicketResponse:
 # }
 
 @app.delete('/api/v1/tickets/{ticketUid}', status_code=204)
-def get_persons(ticketUid: str, x_user_name: str = Header()):
+def get_persons(ticketUid: str, user_info: dict=Depends(auth_dependency)):
+    user_name = user_info["preferred_username"]
     response = requests.delete(f"http://{ticketsAPI}/tickets/{ticketUid}")
     if response.status_code == HTTPStatus.NOT_FOUND:
         return JSONResponse(content={"message": "Ticket not found"}, status_code=404)
@@ -217,7 +260,7 @@ def get_persons(ticketUid: str, x_user_name: str = Header()):
     if response.status_code == HTTPStatus.OK:
         return
 
-    response = requests.post(f"http://{bonusesAPI}/bonuses/cancel", json=jsonable_encoder(CancelTicketJSON(name=x_user_name, ticketUid=ticketUid)))
+    response = requests.post(f"http://{bonusesAPI}/bonuses/cancel", json=jsonable_encoder(CancelTicketJSON(name=user_name, ticketUid=ticketUid)))
     if response.status_code != HTTPStatus.ACCEPTED:
         return JSONResponse(content={"message": "User or ticket not found"}, status_code=404)
 
@@ -231,8 +274,9 @@ def get_persons(ticketUid: str, x_user_name: str = Header()):
 # }
 
 @app.get('/api/v1/me', status_code=200)
-def get_persons(x_user_name: str = Header()) -> UserInfoResponse:
-    response = requests.get(f"http://{ticketsAPI}/tickets/", params={"user_name": x_user_name})
+def get_persons(user_info: dict=Depends(auth_dependency)) -> UserInfoResponse:
+    user_name = user_info["preferred_username"]
+    response = requests.get(f"http://{ticketsAPI}/tickets/", params={"user_name": user_name})
     tickets = []
     if response.status_code == HTTPStatus.OK:
         rawTickets: list[TicketJSON] = [TicketJSON(**i) for i in response.json()]
@@ -241,7 +285,7 @@ def get_persons(x_user_name: str = Header()) -> UserInfoResponse:
             if response.status_code == HTTPStatus.OK:
                 flight_json = response.json()
                 tickets.append(TicketResponse(ticketUid=ticket.ticketUid, status=ticket.status, **flight_json))
-    response = requests.get(f"http://{bonusesAPI}/bonuses/{x_user_name}")
+    response = requests.get(f"http://{bonusesAPI}/bonuses/{user_name}")
     if response.status_code != HTTPStatus.OK:
         return JSONResponse({}, 200)
     return UserInfoResponse(tickets=tickets, privilege=PrivilegeDataJSON(**response.json()))
@@ -269,8 +313,9 @@ def get_persons(x_user_name: str = Header()) -> UserInfoResponse:
 # }
 
 @app.get('/api/v1/privilege', status_code=200)
-def get_persons(x_user_name: str = Header()) -> PrivilegeInfoResponse:
-    response = requests.get(f"http://{bonusesAPI}/history/{x_user_name}")
+def get_persons(user_info: dict=Depends(auth_dependency)) -> PrivilegeInfoResponse:
+    user_name = user_info["preferred_username"]
+    response = requests.get(f"http://{bonusesAPI}/history/{user_name}")
     if response.status_code != HTTPStatus.OK:
         return JSONResponse({}, 200)
     return PrivilegeInfoResponse(**response.json())
